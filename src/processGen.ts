@@ -1,5 +1,6 @@
+import { getMasks, getTiles } from "./themes";
 // assumed constants
-const TILE_SIZE = 15; // pixel value of tile size = default 128
+const TILE_SIZE = 10; // pixel value of tile size = default 128
 const gridIndecies = {
   cols: {},
   rows: {}
@@ -14,19 +15,15 @@ const colors = {
   null: "white"
 };
 
-const findGridLocationFromXYCoordinates = (xLoc, yLoc, ranges) => {
+const findGridLocationFromXYCoordinates = (xLoc, yLoc) => {
   const { cols, rows } = gridIndecies;
+  const nxLoc = xLoc > 0 ? xLoc - 1 : xLoc;
+  const nyLoc = yLoc > 0 ? yLoc - 1 : yLoc;
 
   return {
-    x: cols[xLoc] || null,
-    y: rows[yLoc] || null
+    x: cols[nxLoc] || null,
+    y: rows[nyLoc] || null
   };
-  // console.log("LocX ", xLoc, " LocY ", yLoc,  ' IN RAnge ', ranges);
-  // const { minX, maxX, minY, maxY, xRangeEnd, yRangeEnd } = ranges;
-  // return {
-  //   x: Math.round(((xLoc - minX) / (maxX - minX)) * xRangeEnd),
-  //   y: Math.round(((yLoc - minY) / (maxY - minY)) * yRangeEnd)
-  // };
 };
 // process metadata to get sizes and grid
 const parseData = (mapData) => {
@@ -54,42 +51,27 @@ const parseData = (mapData) => {
   }
 
   console.log("GII ", gridIndecies);
-  const baseGrid = Array.from({ length: height }, () =>
-    new Array(width).fill(null)
-  );
 
   // performance.mark("grid-started");
-
   const filledGrid = mapData.neighborhoods.reduce(
-    (output, lData) => {
+    (output, lData, index) => {
       const { x, y } = lData.location;
       const { theme } = lData;
-      const { x: gridX, y: gridY } = findGridLocationFromXYCoordinates(x, y, {
-        minX,
-        maxX,
-        minY,
-        maxY,
-        xRangeEnd: width,
-        yRangeEnd: height
-      });
+      const gridX = gridIndecies.cols[x > 0 ? x - 1 : x];
+      const gridY = gridIndecies.rows[y > 0 ? y - 1 : y];
 
       if (!output.filteredTiles[theme]) {
         output.filteredTiles[theme] = [];
       }
 
-      // output.filteredTiles[theme].push(lData);
       output.filteredTiles[theme].push({
         ...lData,
         gridLocation: { x: gridX, y: gridY }
       });
 
-      if (gridY && gridX) {
-        output.baseGrid[gridY][gridX] = lData.theme;
-      }
-
       return output;
     },
-    { baseGrid, filteredTiles: {} }
+    { filteredTiles: {} }
   );
 
   // performance.mark("grid-ended");
@@ -117,31 +99,50 @@ const parseData = (mapData) => {
 };
 
 // use processed data to generate raw map
-const generateRawMap = (mapGridData, mapGrid, gridSize = 0, context) => {
-  // console.log(
-  //   "DRAW ",
-  //   mapGridData.length,
-  //   " tiles from a total of ",
-  //   gridSize,
-  //   " tiles"
-  // );
-  const { baseGrid } = mapGrid;
-  baseGrid.forEach((rowItem, rowIndex) => {
-    const yPos = rowIndex * TILE_SIZE;
-    rowItem.forEach((colItem, colIndex) => {
-      const xPos = colIndex * TILE_SIZE;
-      context.fillStyle = colors[colItem];
-      context.fillRect(xPos, yPos, TILE_SIZE, TILE_SIZE);
-    });
+const generateRawMap = (mapGridData, mapGrid, context, tilesData, canvas) => {
+  console.log("tt cooper ", tilesData);
+  const { keys, places } = tilesData;
+  mapGridData.forEach((item) => {
+    const {
+      theme,
+      location: { x, y }
+    } = item;
+    const gridX = gridIndecies.cols[x > 0 ? x - 1 : x];
+    const gridY = gridIndecies.rows[y > 0 ? y - 1 : y];
+
+    if (gridY !== undefined && gridX !== undefined) {
+      if (!keys.includes(theme)) {
+        context.fillStyle = colors[theme];
+        context.fillRect(
+          gridX * TILE_SIZE,
+          gridY * TILE_SIZE,
+          TILE_SIZE,
+          TILE_SIZE
+        );
+      } else {
+        const { width, height } = places[theme].img;
+        context.drawImage(
+          places[theme].img,
+          0,
+          0,
+          width,
+          height,
+          gridX * TILE_SIZE,
+          gridY * TILE_SIZE,
+          TILE_SIZE,
+          TILE_SIZE
+        );
+      }
+    }
   });
 
-  console.log("generate a map with the grid ::: ", mapGrid);
+  // console.log("generate a map with the grid ::: ", mapGridData);
 };
 
 // apply masks
 
 // break final map into image chunks
-const generateFinalizedMap = (mapGenData, outputCanvas) => {
+const generateFinalizedMap = async (mapGenData, outputCanvas) => {
   if (!mapGenData.metadata || !mapGenData.neighborhoods)
     throw new Error("Map data needs to contain metadata and neighborhoods");
   const {
@@ -157,16 +158,20 @@ const generateFinalizedMap = (mapGenData, outputCanvas) => {
 
   const ctx = outputCanvas.getContext("2d");
   //canvas fill
-  ctx.fillStyle = "blue";
+  ctx.fillStyle = "white";
   ctx.fillRect(0, 0, widthInPixels, heightInPixels);
 
-  console.log("META ", mapGenData.metadata);
-  console.log("Size ", size);
-  console.log("Map Height in tiles ", height);
-  console.log("Map Width in tiles ", width);
-  console.log("GRID DETAILS ", grid);
+  // console.log("META ", mapGenData.metadata);
+  // console.log("Size ", size);
+  // console.log("Map Height in tiles ", height);
+  // console.log("Map Width in tiles ", width);
+  // console.log("GRID DETAILS ", grid);
 
-  generateRawMap(mapGenData.neighborhoods, grid, size, ctx);
+  const maskData = await getMasks();
+  // console.log("MASK DATA FETCH ", maskData);
+  const tileItems = await getTiles();
+  // console.log("Tile images ", tileItems);
+  generateRawMap(mapGenData.neighborhoods, grid, ctx, tileItems, outputCanvas);
 };
 
 export { parseData, generateRawMap, generateFinalizedMap };
