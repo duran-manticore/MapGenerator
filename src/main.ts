@@ -2,7 +2,7 @@ import "./style.css";
 import { mData } from "./data";
 import { generateFinalizedMap } from "./processGen";
 // const { metadata } = mData;
-console.clear();
+// console.clear();
 // document.getElementById("app").innerHTML = `
 // <h1>Hello Vanilla!</h1>
 // <div>
@@ -13,8 +13,6 @@ console.clear();
 // <canvas id="canvas-content"/>
 // `;
 document.getElementById("app").innerHTML = `
-<h1>Hello generator!</h1>
-
 <canvas id="canvas-content"/>
 `;
 

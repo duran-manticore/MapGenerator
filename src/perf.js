@@ -27,6 +27,8 @@ const strGen = () => Math.random().toString(36);
 const SPACER = () => console.log('\n\n');
 const createPerfItems = () => {
   const perfBase = new Map();
+  const settingsChangeTraces = new Map();
+  let settings = {enableConsoleOutput: true};
   return (perfName) => {
     const sName = !perfName ? strGen() : perfName;
     const eName = `${sName}-${END}`;
@@ -39,6 +41,7 @@ const createPerfItems = () => {
       },
       diff: () => {
         if(!endMarkCreated) throw new Error("End \'mark()\' function must be called before diff()");
+        if(!settings.enableConsoleOutput) return;
         const measureTitle = `${sName}-${MES}`;
         const measurement = performance.measure(measureTitle, sName, eName);
         perfBase.set(sName, measurement);
@@ -51,7 +54,20 @@ const createPerfItems = () => {
         SPACER()
       },
       outputAll: () => {
-        console.log("ALL PERF ITEMS ", perfBase);
+        console.log("*needs formatting*: ALL PERF ITEMS ", perfBase);
+        return perfBase
+      },
+      updateSettings: ({enableConsoleOutput = true}) => {
+        const stack = new Error('Use Error as stack trace. Setting were updated in');
+        settingsChangeTraces.set(strGen, {
+          fullData: stack,
+          updateCalledFrom: stack.stack.split('\n')[1] || stack.stack
+        })
+        settings = {...settings, enableConsoleOutput}
+      },
+      locateSettingsUpdateCalls: () => {
+        console.log("All settings update calls in your code ", [...settingsChangeTraces])
+        return settingsChangeTraces
       }
     }
   }
